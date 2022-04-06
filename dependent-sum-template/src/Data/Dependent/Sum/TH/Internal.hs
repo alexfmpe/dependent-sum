@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE PolyKinds #-}
@@ -8,6 +9,7 @@
 module Data.Dependent.Sum.TH.Internal where
 
 import Control.Monad
+import Data.List
 import Language.Haskell.TH
 import Language.Haskell.TH.Extras
 
@@ -38,7 +40,10 @@ deriveForDec className _ f (InstanceD overlaps cxt classHead decs) = do
         _ -> fail $ "while deriving " ++ show className ++ ": the name of an algebraic data type constructor is required"
 deriveForDec className makeClassHead f (DataD dataCxt name bndrs _ cons _) = return <$> inst
     where
-        inst = instanceD (cxt (map return dataCxt)) (makeClassHead $ conT name) [dec]
+        classHead = appT (conT className) $ foldl' appT (conT name) $ flip fmap (drop 1 bndrs) $ varT . \case
+          PlainTV n -> n
+          KindedTV n _ -> n
+        inst = instanceD (cxt (map return dataCxt)) classHead [dec]
         dec = f bndrs cons
 #if __GLASGOW_HASKELL__ >= 808
 deriveForDec className makeClassHead f (DataInstD dataCxt tvBndrs ty _ cons _) = return <$> inst
